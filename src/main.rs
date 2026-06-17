@@ -1,4 +1,5 @@
 use colored::*;
+use dialoguer::MultiSelect;
 use regex::Regex;
 use std::io::{self, Write};
 use std::process::Command;
@@ -47,12 +48,27 @@ fn main() {
         return;
     }
 
+    print_gone_branches(&gone_branches, &current_branch);
+
+    let selected_branches = match select_branches_to_delete(&gone_branches, &current_branch) {
+        Ok(branches) => branches,
+        Err(e) => {
+            eprintln!("{}", format!("❌ Selection failed: {}", e).red());
+            return;
+        }
+    };
+
+    if selected_branches.is_empty() {
+        println!("{}", "⚠️ No branches selected for deletion.".yellow());
+        return;
+    }
+
     if !ask_confirmation() {
         println!("{}", "❌ Operation cancelled by user.".red());
         return;
     }
 
-    let summary = delete_branches(gone_branches, &current_branch);
+    let summary = delete_branches(selected_branches, &current_branch);
     print_summary(&summary);
 
     println!("\nPress any key to exit...");
@@ -118,6 +134,59 @@ fn ask_confirmation() -> bool {
         "s" | "sim" | "y" | "yes" => true,
         _ => false,
     }
+}
+
+fn print_gone_branches(gone: &[String], current: &str) {
+    println!();
+    println!("{}", "📋 Branches marked as [gone]:".cyan());
+
+    for (index, branch) in gone.iter().enumerate() {
+        if branch == current {
+            println!(
+                "{}",
+                format!(
+                    "  {}. {} (current branch, will be skipped)",
+                    index + 1,
+                    branch
+                )
+                .yellow()
+            );
+        } else {
+            println!("{}", format!("  {}. {}", index + 1, branch).white());
+        }
+    }
+}
+
+fn select_branches_to_delete(gone: &[String], current: &str) -> Result<Vec<String>, String> {
+    let eligible: Vec<String> = gone
+        .iter()
+        .filter(|branch| branch.as_str() != current)
+        .cloned()
+        .collect();
+
+    println!();
+    println!(
+        "{}",
+        "✅ All eligible branches are selected for deletion by default.".green()
+    );
+    println!(
+        "{}",
+        "Use Space to toggle a branch, Enter to confirm, and arrows to move.".white()
+    );
+    println!();
+
+    let defaults = vec![true; eligible.len()];
+    let selected_indexes = MultiSelect::new()
+        .with_prompt("Select branches to delete")
+        .items(&eligible)
+        .defaults(&defaults)
+        .interact()
+        .map_err(|e| format!("interactive prompt failed: {}", e))?;
+
+    Ok(selected_indexes
+        .into_iter()
+        .map(|index| eligible[index].clone())
+        .collect())
 }
 
 struct Summary {

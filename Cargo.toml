@@ -8,6 +8,7 @@ repository = "https://github.com/eldertorres/git-clean-gone"
 
 [dependencies]
 colored = "3.0.0"
+dialoguer = "0.12.0"
 regex = "1.12.2"
 
 # Config for 'dist'
